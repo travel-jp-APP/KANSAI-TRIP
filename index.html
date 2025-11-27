@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>KANSAI TRIP 行程表</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="KANSAI TRIP">
+    <link rel="apple-touch-icon" href="/app-icon.png">
+    <link rel="icon" href="/app-icon.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        /* 隱藏滾動條的樣式 (對應 .no-scrollbar) */
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        /* 確保內容在 iOS 安全區域內 (.pb-safe) */
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        /* 模擬 animate-fade-in-up */
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 0.4s ease-out forwards;
+        }
+        /* 模擬 animate-fade-in */
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.4s ease-out forwards;
+        }
+        /* 限制手機模擬的寬度 */
+        .md-max-width {
+            max-width: 448px; /* md:max-w-md */
+        }
+    </style>
+</head>
+<body class="bg-stone-200">
+
+<div id="app-root" class="bg-stone-100 min-h-screen pb-20 font-sans text-stone-900 md-max-width md:mx-auto shadow-2xl overflow-hidden relative">
+
+    <div class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-sm">
+        <div id="header-content" class="px-4 py-3 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-black tracking-tighter text-indigo-900">KANSAI TRIP</h1>
+                <p class="text-xs text-stone-400 font-medium tracking-widest">DEC 27 - JAN 04</p>
+            </div>
+            <div id="weather-widget" class="flex items-center gap-2 bg-stone-100 px-3 py-1.5 rounded-full hidden">
+                </div>
+        </div>
+
+        <div id="date-selector" class="flex overflow-x-auto gap-3 px-4 pb-3 no-scrollbar snap-x hidden">
+            </div>
+    </div>
+
+    <div id="main-content" class="p-4 space-y-4 min-h-[calc(100vh-180px)]">
+        </div>
+
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-stone-200 md-max-width md:mx-auto pb-safe safe-area-bottom z-50">
+        <div class="flex justify-around items-center h-16">
+            <button id="tab-itinerary" class="flex flex-col items-center justify-center w-full h-full space-y-1 text-indigo-600" data-tab="itinerary">
+                <i data-lucide="calendar" class="w-5 h-5" data-stroke-width="2.5"></i>
+                <span class="text-[10px] font-medium">行程</span>
+            </button>
+            <button id="tab-flights" class="flex flex-col items-center justify-center w-full h-full space-y-1 text-stone-400" data-tab="flights">
+                <i data-lucide="plane" class="w-5 h-5" data-stroke-width="2"></i>
+                <span class="text-[10px] font-medium">航班</span>
+            </button>
+            <button id="tab-hotels" class="flex flex-col items-center justify-center w-full h-full space-y-1 text-stone-400" data-tab="hotels">
+                <i data-lucide="hotel" class="w-5 h-5" data-stroke-width="2"></i>
+                <span class="text-[10px] font-medium">住宿</span>
+            </button>
+            <button id="tab-manhole" class="flex flex-col items-center justify-center w-full h-full space-y-1 text-stone-400" data-tab="manhole">
+                <i data-lucide="stamp" class="w-5 h-5" data-stroke-width="2"></i>
+                <span class="text-[10px] font-medium">庫存狀況</span>
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- 1. DATA STRUCTURE (TRIP_DATA) ---
+    // 這是從您的 React 程式碼中提取的行程數據
+    const TRIP_DATA = {
+        flights: [
+            { type: "Departure", date: "2025/12/27 (六)", code: "CX564", airline: "國泰航空", route: "TPE 台北 (11:15) ➔ KIX 大阪 (14:55)", terminal: "TPE T1 / KIX T1", duration: "2h 40m", aircraft: "Airbus A330-300", class: "經濟 Q" },
+            { type: "Return", date: "2026/01/04 (日)", code: "CX565", airline: "國泰航空", route: "KIX 大阪 (16:05) ➔ TPE 台北 (18:30)", terminal: "KIX T1 / TPE T1", duration: "3h 25m", aircraft: "Airbus A330-300", class: "經濟 S" }
+        ],
+        hotels: [
+            { name: "草津波士頓廣場飯店", engName: "Hotel Boston Plaza Kusatsu", dates: "12/27 - 1/1 (5晚)", location: "滋賀縣草津市 (JR草津站旁)", features: ["交通便利", "美式風格", "適合自駕"], note: "作為滋賀縣蓋孔卡收集的基地非常合適。" },
+            { name: "REF 京都八條口 by VESSEL HOTELS", engName: "REF Kyoto Hachijoguchi", dates: "1/1 - 1/4 (3晚)", location: "京都市南區 (京都站八條口)", features: ["大浴場", "現代日式", "免費迎賓飲料"], note: "靠近京都車站，方便前往神戶、奈良與回程機場。" }
+        ],
+        itinerary: [
+            { id: "day1", date: "12/27", dayOfWeek: "六", location: "大阪 ➔ 滋賀", weather: "sunny", temp: "8°C", items: [{ type: "transport", time: "11:15", title: "搭乘 CX564 飛往大阪", note: "預計 14:55 抵達關西機場 T1" }, { type: "visit", time: "15:30", title: "臨空城觀光案內所", tag: "收集", note: "🔥 領取蓋孔卡/紀念品。營業至20:00。" }, { type: "shop", time: "16:00", title: "臨空城 Outlet", highlight: "必買: 運動品牌、日系服飾", note: "晚餐可在此解決。營業至20:00。" }, { type: "transport", time: "19:00", title: "前往草津", note: "關西機場 → 京都車站 → 草津車站" }, { type: "hotel", time: "21:30", title: "入住：草津波士頓廣場飯店", note: "位於草津站西口，休息準備明日自駕。" }]},
+            { id: "day2", date: "12/28", dayOfWeek: "日", location: "滋賀自駕", weather: "cloudy", temp: "6°C", items: [{ type: "transport", time: "08:30", title: "租車：Toyota Rent a Car", note: "草津站西口店取車。" }, { type: "visit", time: "09:00", title: "大津車站觀光案内所", tag: "收集", note: "蓋孔卡領取點 1。營業至18:00。" }, { type: "visit", time: "09:40", title: "Kusatsu Yume-Honjin", tag: "收集", note: "くさつ夢本陣，領取蓋孔卡。09:30開門。" }, { type: "visit", time: "10:20", title: "栗東観光案内所 (2F)", tag: "收集", note: "位於手原站。注意營業時間至12:00 (通常假日可能有變動，請優先前往)。" }, { type: "visit", time: "11:00", title: "守山市駅前総合案内所", tag: "收集", note: "位於守山站。07:30早開。" }, { type: "visit", time: "12:00", title: "八日市駅前観光交流施設", tag: "收集", note: "東近江市的大風箏博物館附近。" }, { type: "visit", time: "13:00", title: "豊郷町観光案内所", tag: "收集", note: "豐鄉小學校舊校舍群（K-ON輕音部聖地）旁。" }, { type: "visit", time: "14:00", title: "彥根市上下水道中心", tag: "收集", note: "需平日或特定假日窗口，請確認守衛室位置。" }, { type: "visit", time: "14:30", title: "彥根城 & 彥根貓博物館", highlight: "國寶五城", note: "🔥 必看：彥根貓(Hikonyan)表演場次。賞櫻名所(雖是冬天)。" }, { type: "shop", time: "17:00", title: "MITSUI OUTLET PARK 滋賀龍王", highlight: "近江牛晚餐", note: "關西最大級 Outlet。晚餐推薦近江牛料理。" }]},
+            { id: "day3", date: "12/29", dayOfWeek: "一", location: "海之京都", weather: "rain", temp: "4°C", items: [{ type: "visit", time: "09:00", title: "伊根灣賞景觀光船", highlight: "必拍: 舟屋群", note: "購買蝦條餵海鷗。遊覽時間約25分鐘。" }, { type: "visit", time: "10:30", title: "道の駅 海の京都 宮津", tag: "收集", note: "宮津觀光案內所領取蓋孔卡。" }, { type: "food", time: "12:00", title: "午餐：天橋立周邊", highlight: "必吃: 蛤蠣丼 (Asari Don)", note: "推薦：富田屋 (海鮮超值)、Suginoya、海鮮工房。" }, { type: "visit", time: "13:30", title: "天橋立 (傘松公園)", highlight: "日本三景", note: "搭乘纜車/吊椅上山，從胯下窺看「飛龍在天」。" }, { type: "visit", time: "15:00", title: "元伊勢 籠神社 & 智恩寺", note: "參拜古老神社。" }, { type: "visit", time: "16:00", title: "天橋立 View Land", note: "從另一側看飛龍觀。注意纜車末班時間 (冬季約16:30-17:00)。" }]},
+            { id: "day4", date: "12/30", dayOfWeek: "二", location: "長濱/琵琶湖", weather: "cloudy", temp: "5°C", items: [{ type: "visit", time: "08:50", title: "竹生島觀光船", note: "從長濱港出發。竹生島是能量景點 (Power Spot)。" }, { type: "visit", time: "10:00", title: "竹生島 寶嚴寺", highlight: "投擲瓦片祈福", note: "參拜弁財天。" }, { type: "visit", time: "12:00", title: "黑壁廣場 (黑壁Square)", highlight: "必吃: 96Cafe 黑咖哩", note: "玻璃工藝品店林立，充滿大正浪漫氛圍。" }, { type: "visit", time: "14:30", title: "多賀大社", highlight: "長壽祈願", note: "滋賀縣第一大社，門口有著名「糸切餅」。" }, { type: "visit", time: "16:00", title: "近江神宮", highlight: "花牌情緣聖地", note: "以競技歌牌聞名，建築朱紅美麗。" }]},
+            { id: "day5", date: "12/31", dayOfWeek: "三", location: "近江八幡", weather: "snow", temp: "3°C", items: [{ type: "visit", time: "09:00", title: "八幡山纜車 & 城跡", note: "眺望琵琶湖與西之湖美景。" }, { type: "visit", time: "10:30", title: "八幡堀遊船", highlight: "時代劇取景地", note: "在充滿風情的水鄉乘船漫遊。" }, { type: "visit", time: "12:30", title: "La Collina 近江八幡", highlight: "必買: Club Harie 年輪蛋糕", note: "建築大師藤森照信設計的童話草屋。必吃現烤年輪蛋糕、銅鑼燒。" }, { type: "food", time: "17:00", title: "跨年晚餐", note: "建議提前預訂餐廳，或在超市購買豐盛晚餐回飯店享用。" }]},
+            { id: "day6", date: "1/1", dayOfWeek: "四", location: "神戶/初詣", weather: "sunny", temp: "7°C", items: [{ type: "transport", time: "08:00", title: "移動至京都並前往神戶", note: "先去 REF 京都飯店寄放行李，再搭阪急前往神戶三宮。" }, { type: "visit", time: "10:30", title: "生田神社", highlight: "戀愛結緣", note: "新年參拜 (初詣) 人潮眾多，請預留時間。" }, { type: "visit", time: "12:00", title: "北野天滿神社", highlight: "眺望神戶港", note: "位於異人館區的高點。" }, { type: "visit", time: "14:00", title: "神戶機場 綜合案內所", tag: "收集", note: "領取蓋孔卡。搭乘 Port Liner 前往。" }, { type: "visit", time: "15:30", title: "蘆屋市役所守衛室", tag: "收集", note: "雖然是元旦，但守衛室通常可領卡，建議先確認。" }, { type: "visit", time: "16:30", title: "大鳥大社", tag: "收集", note: "大阪堺市。順路參拜。" }]},
+            { id: "day7", date: "1/2", dayOfWeek: "五", location: "奈良/宇治", weather: "sunny", temp: "6°C", items: [{ type: "visit", time: "08:30", title: "春日大社", highlight: "鹿與燈籠", note: "參道上的鹿群很可愛但請小心仙貝。" }, { type: "food", time: "11:00", title: "水谷茶屋", highlight: "茅草屋茶屋", note: "拍照超美，推薦烏龍麵或蕨餅。" }, { type: "visit", time: "12:30", title: "東大寺 & 二月堂", highlight: "世界最大木造建築", note: "必看大佛。二月堂可俯瞰奈良市景。" }, { type: "visit", time: "14:00", title: "奈良町南觀光案內所", tag: "收集", note: "領取奈良蓋孔卡。" }, { type: "visit", time: "15:30", title: "宇治觀光中心", tag: "收集", note: "領取宇治蓋孔卡。順便逛表參道。" }, { type: "shop", time: "16:30", title: "吉伊卡哇 (Chikawa) 伏見店", highlight: "京都限定", note: "Mogumogu 本舖。必買伏見稻荷限定周邊。" }]},
+            { id: "day8", date: "1/3", dayOfWeek: "六", location: "京都巡禮", weather: "cloudy", temp: "5°C", items: [{ type: "visit", time: "08:30", title: "天龍寺 (嵐山)", highlight: "曹源池庭園", note: "世界遺產。早晨人較少，空氣清新。" }, { type: "visit", time: "10:30", title: "尋找鳳王人孔蓋", tag: "收集", note: "寶可夢人孔蓋『鳳王』位於京都（通常在公園或地標前）。" }, { type: "visit", time: "13:00", title: "仁和寺", note: "以御室櫻聞名（雖非花季），皇室淵源深厚。" }, { type: "visit", time: "15:00", title: "平安神宮", note: "巨大的紅色鳥居。腹地廣大。" }, { type: "shop", time: "16:30", title: "Pokemon Center Kyoto", highlight: "藝妓皮卡丘", note: "位於 SUINA 室町 2F。必買京都限定玩偶。" }, { type: "shop", time: "18:00", title: "吉伊卡哇 Land 京都四條河原町", note: "Kiddyland 內。繼續補貨。" }]},
+            { id: "day9", date: "1/4", dayOfWeek: "日", location: "大阪 ➔ 台北", weather: "sunny", temp: "8°C", items: [{ type: "transport", time: "08:12", title: "前往大阪", note: "京都車站 → 大阪（寄放行李或直接前往景點）。" }, { type: "visit", time: "09:30", title: "大阪市下水道科學館", tag: "收集", note: "🔥 蓋孔卡聖地！互動展覽也很有趣。" }, { type: "visit", time: "11:00", title: "ATC Green Eco Plaza", note: "位於南港。兼具環保教育與觀光。" }, { type: "visit", time: "12:30", title: "堺東觀光案內所", tag: "收集", note: "領取堺市蓋孔卡。" }, { type: "visit", time: "13:30", title: "岸和田站前觀光案內所", tag: "收集", note: "以岸和田祭（拉車祭）聞名。" }, { type: "visit", time: "14:15", title: "泉佐野市觀光情報中心", tag: "收集", note: "關西機場對岸，最後一站收集！" }, { type: "transport", time: "14:40", title: "前往關西機場", note: "搭乘南海電車前往機場。" }, { type: "transport", time: "16:05", title: "搭乘 CX565 返台", note: "再見關西！預計 18:30 抵達台北。" }]}
+        ],
+        manholeStock: [
+            { name: "臨空城案內所", region: "大阪", hours: "09:00–20:00", url: "https://www.city.izumisano.lg.jp/kakuka/jogesuidokyoku/jogesui/menu/1511934914176.html" },
+            { name: "大津車站觀光案内所", region: "滋賀", hours: "09:00–18:00", url: "https://www.city.otsu.lg.jp/soshiki/080/2808/g/a/6.html" },
+            { name: "くさつ夢本陣", region: "滋賀", hours: "09:30–17:00", url: "https://www.city.kusatsu.shiga.jp/kurashi/suidogesuido/gesuido/manholecard.html" },
+            { name: "草津宿街道交流館", region: "滋賀", hours: "09:00–17:00", url: "https://www.city.kusatsu.shiga.jp/kurashi/suidogesuido/gesuido/manholecard.html" },
+            { name: "栗東観光案内所", region: "滋賀", hours: "08:30–12:00", url: "https://www.city.ritto.lg.jp/soshiki/jogeuido/jogesuido/oshirase/7224.html" },
+            { name: "栗東市立図書館", region: "滋賀", hours: "10:00–17:00", url: "https://www.city.ritto.lg.jp/soshiki/jogeuido/jogesuido/oshirase/7224.html" },
+            { name: "守山市駅前総合案内所", region: "滋賀", hours: "07:30–19:30", url: "https://www.city.moriyama.lg.jp/kurashitetsuzuki/jougesuido/1001701/1008797.html" },
+            { name: "八日市駅前観光交流施設", region: "滋賀", hours: "10:00–17:00", url: "https://www.city.higashiomi.shiga.jp/kurashi_tetsuzuki/jougesuidou/1008975/1009690.html" },
+            { name: "東近江市役所 守衛室", region: "滋賀", hours: "10:00–16:00", url: "https://www.city.higashiomi.shiga.jp/kurashi_tetsuzuki/jougesuidou/1008975/1008976.html" },
+            { name: "豊郷町観光案内所", region: "滋賀", hours: "09:00–17:00", url: "https://www.town.toyosato.shiga.jp/0000001749.html" },
+            { name: "彥根市上下水道料金お客様サービスセンター", region: "滋賀", hours: "請參考網站", url: "https://www.city.hikone.lg.jp/kakuka/jogesuido/2/2219.html" },
+            { name: "ひこね食賓館四番町ダイニング", region: "滋賀", hours: "請參考網站", url: "https://www.city.hikone.lg.jp/kakuka/jogesuido/2/2219.html" },
+            { name: "「道の駅 海の京都 宮津」観光案内所", region: "京都", hours: "請參考網站", url: "https://www.pref.kyoto.jp/gesuido/manholemiyazu.html" },
+            { name: "神戸空港 1 階総合案内所", region: "兵庫", hours: "請參考網站", url: "https://www.city.kobe.lg.jp/a78445/kurashi/sumai/sewage/pr/manhole_card.html" },
+            { name: "芦屋市役所守衛室", region: "兵庫", hours: "請參考網站", url: "https://www.city.ashiya.lg.jp/gesuidou/mhc.html" },
+            { name: "大阪観光案内所(JR 車站內)", region: "大阪", hours: "請參考網站", url: "https://www.city.osaka.lg.jp/kensetsu/page/0000431121.html" },
+            { name: "奈良町南観光案内所", region: "奈良", hours: "請參考網站", url: "https://h2o.nara.nara.jp/info_924.html" },
+            { name: "宇治市観光センター", region: "京都", hours: "請參考網站", url: "https://www.city.uji.kyoto.jp/soshiki/12/6038.html" },
+            { name: "大阪市下水道科學館", region: "大阪", hours: "請參考網站", url: "https://www.city.osaka.lg.jp/kensetsu/page/0000431121.html" },
+            { name: "おおさか ATC グリーンエコプラザ", region: "大阪", hours: "請參考網站", url: "https://www.city.osaka.lg.jp/kensetsu/page/0000431121.html" },
+            { name: "堺東観光案内所", region: "大阪", hours: "請參考網站", url: "https://water.city.sakai.lg.jp/about/kouhou/1522311572373.html" },
+            { name: "岸和田駅前観光案内所", region: "大阪", hours: "請參考網站", url: "https://www.city.kishiwada.lg.jp/page/56-manholecard.html" },
+            { name: "まちの駅かいづか", region: "大阪", hours: "請參考網站", url: "https://www.city.kaizuka.lg.jp/kakuka/jogesuido/gesuisuisin/topics/manholucard.html" },
+            { name: "泉佐野市観光情報センター", region: "大阪", hours: "請參考網站", url: "https://www.city.izumisano.lg.jp/kakuka/jogesuidokyoku/jogesui/menu/1511934914176.html" },
+        ]
+    };
+    
+    // --- 2. STATE (狀態) ---
+    let activeTab = 'itinerary';
+    let selectedDayId = 'day1';
+
+    // --- 3. HELPER FUNCTIONS (輔助函式) ---
+    
+    // 獲取圖示和樣式
+    function getItemIcon(type, isCollection) {
+        if (isCollection) {
+            return { icon: 'star', color: 'text-amber-500', borderColor: 'border-l-amber-500', isCollection: true };
+        }
+        switch (type) {
+            case 'food': return { icon: 'utensils', color: 'text-red-400', borderColor: 'border-l-red-400' };
+            case 'transport': return { icon: 'train', color: 'text-indigo-400', borderColor: 'border-l-indigo-400' };
+            case 'shop': return { icon: 'shopping-bag', color: 'text-yellow-500', borderColor: 'border-l-yellow-500' };
+            case 'visit': return { icon: 'camera', color: 'text-emerald-500', borderColor: 'border-l-emerald-500' };
+            case 'hotel': return { icon: 'hotel', color: 'text-purple-400', borderColor: 'border-l-purple-400' };
+            default: return { icon: 'map-pin', color: 'text-stone-400', borderColor: 'border-l-stone-200' };
+        }
+    }
+
+    // 獲取天氣圖示和顏色
+    function getWeatherIcon(type) {
+        switch (type) {
+            case 'sunny': return { icon: 'sun', color: 'text-orange-500' };
+            case 'cloudy': return { icon: 'cloud', color: 'text-gray-500' };
+            case 'rain': return { icon: 'cloud-rain', color: 'text-blue-500' };
+            case 'snow': return { icon: 'snowflake', color: 'text-cyan-400' };
+            default: return { icon: 'sun', color: 'text-orange-500' };
+        }
+    }
+
+    // 渲染單個行程項目
+    function renderItineraryItem(item) {
+        const isCollection = item.tag === "收集";
+        const { icon, color: iconColor, borderColor } = getItemIcon(item.type, isCollection);
+        // 模擬 React 中的 Google Map URL 編碼
+        const googleMapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.title)}`;
+        
+        let html = `
+            <div class="flex gap-4 p-4 bg-white rounded-lg border-l-4 shadow-sm mb-3 ${borderColor}">
+                <div class="flex flex-col items-center min-w-[50px]">
+                    <span class="text-sm font-bold text-stone-600 font-mono">${item.time}</span>
+                    <div class="mt-2 p-1.5 rounded-full bg-stone-50 ${iconColor}">
+                        <i data-lucide="${icon}" size="18" class="w-[18px] h-[18px]"></i>
+                    </div>
+                    ${isCollection ? '<span class="text-[9px] text-amber-600 font-bold mt-1">GET!</span>' : ''}
+                </div>
+                
+                <div class="flex-1">
+                    <div class="flex items-start justify-between">
+                        <h3 class="font-bold text-stone-800 text-lg leading-tight">${item.title}</h3>
+                        <a 
+                            href="${googleMapUrl}" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            class="p-1.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
+                        >
+                            <i data-lucide="navigation" size="16" class="w-4 h-4"></i>
+                        </a>
+                    </div>
+                    
+                    ${item.tag ? `
+                        <div class="mt-1">
+                            <span class="text-[10px] px-2 py-0.5 rounded-full border ${isCollection ? "border-amber-400 text-amber-600 bg-amber-50" : "border-stone-300 text-stone-500"} font-medium mr-2">
+                                ${item.tag}
+                            </span>
+                        </div>` : ''}
+
+                    ${item.highlight ? `
+                        <div class="mt-2 inline-block px-3 py-1 bg-red-50 text-red-600 text-xs rounded-md font-bold">
+                            ★ ${item.highlight}
+                        </div>` : ''}
+
+                    ${item.note ? `
+                        <p class="mt-2 text-sm text-stone-500 leading-relaxed bg-stone-50 p-2 rounded border border-stone-100">
+                             ${item.note}
+                        </p>` : ''}
+                </div>
+            </div>
+        `;
+        return html;
+    }
+
+    // --- 4. RENDER FUNCTIONS (渲染各 Tab 內容) ---
+    
+    function renderWeatherWidget(dayData) {
+        const widget = document.getElementById('weather-widget');
+        const { icon, color } = getWeatherIcon(dayData.weather);
+        
+        widget.innerHTML = `
+            <i data-lucide="${icon}" class="w-5 h-5 ${color}"></i>
+            <span class="text-sm font-bold text-stone-600">${dayData.temp}</span>
+            <span class="text-xs text-stone-400 pl-1 border-l border-stone-300 ml-1">${dayData.location}</span>
+        `;
+        widget.classList.remove('hidden');
+        lucide.createIcons(); // 重新渲染 Lucide 圖示
+    }
+
+    function renderDateSelector() {
+        const selector = document.getElementById('date-selector');
+        selector.innerHTML = '';
+        selector.classList.remove('hidden');
+
+        TRIP_DATA.itinerary.forEach(day => {
+            const isSelected = day.id === selectedDayId;
+            const button = document.createElement('button');
+            button.className = `flex-shrink-0 snap-center flex flex-col items-center justify-center w-14 h-16 rounded-xl border transition-all duration-300 day-btn ${isSelected ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 scale-105" : "bg-white border-stone-200 text-stone-400 hover:border-indigo-300"}`;
+            button.setAttribute('data-day', day.id);
+            button.innerHTML = `
+                <span class="text-[10px] font-medium uppercase leading-none mb-1">${day.date}</span>
+                <span class="text-lg font-black leading-none">${day.dayOfWeek}</span>
+            `;
+            button.onclick = () => {
+                setSelectedDay(day.id);
+            };
+            selector.appendChild(button);
+        });
+
+        // Auto scroll to selected day button (模擬 useEffect 的行為)
+        const selectedBtn = selector.querySelector(`[data-day="${selectedDayId}"]`);
+        if (selectedBtn) {
+            selectedBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }
+    
+    function renderItinerary() {
+        const mainContent = document.getElementById('main-content');
+        const currentDayData = TRIP_DATA.itinerary.find(d => d.id === selectedDayId);
+        
+        let html = `
+            <div class="animate-fade-in-up">
+                <div class="flex items-center justify-between mb-4 px-1">
+                    <h2 class="text-lg font-bold text-stone-700">
+                        Day ${selectedDayId.replace('day', '')} 
+                        <span class="ml-2 text-sm font-normal text-stone-500">${currentDayData.location}</span>
+                    </h2>
+                </div>
+                ${currentDayData.items.map(renderItineraryItem).join('')}
+                <div class="h-10"></div>
+            </div>
+        `;
+        mainContent.innerHTML = html;
+        renderWeatherWidget(currentDayData);
+        renderDateSelector();
+        lucide.createIcons();
+    }
+
+    function renderFlights() {
+        const mainContent = document.getElementById('main-content');
+        document.getElementById('weather-widget').classList.add('hidden');
+        document.getElementById('date-selector').classList.add('hidden');
+
+        let flightItems = TRIP_DATA.flights.map(flight => {
+            const isDeparture = flight.type === 'Departure';
+            return `
+                <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden p-5">
+                    <div class="flex items-center justify-between mb-4 border-b border-stone-100 pb-3">
+                        <span class="text-xs font-bold px-2 py-1 rounded ${isDeparture ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'}">
+                            ${isDeparture ? '去程' : '回程'}
+                        </span>
+                        <span class="font-mono font-bold text-stone-500">${flight.date}</span>
+                    </div>
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="text-3xl font-black text-stone-800">${flight.code}</div>
+                        <i data-lucide="plane" class="text-stone-300 rotate-45 w-5 h-5"></i>
+                    </div>
+                    <div class="text-sm font-medium text-stone-600 mb-4">${flight.airline} • ${flight.class}</div>
+                    
+                    <div class="bg-stone-50 p-4 rounded-lg text-center border border-stone-100">
+                        <div class="text-lg font-bold text-stone-800 mb-1">${flight.route}</div>
+                        <div class="text-xs text-stone-500">${flight.terminal} • ${flight.duration} • ${flight.aircraft}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        mainContent.innerHTML = `
+            <div class="space-y-4 animate-fade-in">
+                <h2 class="text-xl font-bold text-stone-800 px-1">航班資訊</h2>
+                ${flightItems}
+            </div>
+        `;
+        lucide.createIcons();
+    }
+
+    function renderHotels() {
+        const mainContent = document.getElementById('main-content');
+        document.getElementById('weather-widget').classList.add('hidden');
+        document.getElementById('date-selector').classList.add('hidden');
+
+        let hotelItems = TRIP_DATA.hotels.map(hotel => {
+            const googleMapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hotel.name)}`;
+            const featuresHtml = hotel.features.map(f => `<span class="text-[10px] px-2 py-1 bg-indigo-50 text-indigo-600 rounded">${f}</span>`).join('');
+
+            return `
+                <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden p-0">
+                    <div class="h-24 bg-gradient-to-r from-stone-200 to-stone-300 flex items-center justify-center">
+                        <i data-lucide="hotel" class="text-white w-10 h-10 opacity-50"></i>
+                    </div>
+                    <div class="p-5">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-lg font-bold text-stone-800 leading-tight w-3/4">${hotel.name}</h3>
+                            <span class="text-xs bg-stone-100 text-stone-600 px-2 py-1 rounded font-medium whitespace-nowrap">${hotel.dates}</span>
+                        </div>
+                        <p class="text-xs text-stone-400 mb-4 font-mono">${hotel.engName}</p>
+                        
+                        <div class="flex items-start gap-2 mb-4 text-sm text-stone-600">
+                            <i data-lucide="map-pin" class="mt-0.5 text-stone-400 shrink-0 w-4 h-4"></i>
+                            <span>${hotel.location}</span>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2 mb-4">
+                            ${featuresHtml}
+                        </div>
+
+                        <div class="bg-amber-50 p-3 rounded text-xs text-amber-800 border border-amber-100 flex gap-2">
+                            <i data-lucide="info" class="shrink-0 mt-0.5 w-4 h-4"></i>
+                            ${hotel.note}
+                        </div>
+                        
+                        <a 
+                            href="${googleMapUrl}"
+                            target="_blank"
+                            class="mt-4 block w-full py-2 bg-stone-800 text-white text-center rounded-lg text-sm font-bold hover:bg-stone-700 transition"
+                        >
+                            導航至飯店
+                        </a>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        mainContent.innerHTML = `
+            <div class="space-y-4 animate-fade-in">
+                <h2 class="text-xl font-bold text-stone-800 px-1">住宿資訊</h2>
+                ${hotelItems}
+            </div>
+        `;
+        lucide.createIcons();
+    }
+    
+    function renderManholeStockStatus() {
+        const mainContent = document.getElementById('main-content');
+        document.getElementById('weather-widget').classList.add('hidden');
+        document.getElementById('date-selector').classList.add('hidden');
+
+        let tableRows = TRIP_DATA.manholeStock.map((item, index) => `
+            <tr key="${index}" class="hover:bg-indigo-50/50 transition-colors">
+                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-stone-900">${item.region}</td>
+                <td class="px-4 py-3">
+                    <a 
+                        href="${item.url}" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        class="text-indigo-600 hover:text-indigo-800 text-sm font-bold block"
+                    >
+                        ${item.name}
+                    </a>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-xs text-stone-500">${item.hours}</td>
+            </tr>
+        `).join('');
+
+        mainContent.innerHTML = `
+            <div class="animate-fade-in space-y-4">
+                <h2 class="text-xl font-bold text-stone-800 px-1 flex items-center gap-2">
+                    <i data-lucide="stamp" class="text-amber-500 w-6 h-6"></i>
+                    人孔蓋庫存狀況
+                </h2>
+                <p class="text-sm text-stone-600 bg-amber-50 p-3 rounded-lg border border-amber-100 flex items-center gap-2">
+                    <i data-lucide="info" class="text-amber-600 shrink-0 w-4 h-4"></i>
+                    點擊地點名稱可前往該地點的官方庫存查詢網站。
+                </p>
+
+                <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden p-0">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-stone-200">
+                            <thead class="bg-stone-50 sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider w-1/4">地區</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider w-1/2">地點 (點擊查詢庫存)</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-stone-600 uppercase tracking-wider w-1/4">營業時間</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-stone-100">
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+        lucide.createIcons();
+    }
+
+    // --- 5. CONTROL FUNCTIONS (控制邏輯) ---
+
+    function setActiveTab(tabName) {
+        // Update state
+        if (activeTab === tabName) return;
+        activeTab = tabName;
+        
+        // Update Nav Buttons
+        document.querySelectorAll('.fixed button').forEach(button => {
+            const isSelected = button.getAttribute('data-tab') === tabName;
+            const icon = button.querySelector('i');
+            
+            button.className = `flex flex-col items-center justify-center w-full h-full space-y-1 ${isSelected ? 'text-indigo-600' : 'text-stone-400'}`;
+            // 更新 strokeWidth 屬性來模擬粗體圖示
+            if (icon) {
+                 icon.setAttribute('data-stroke-width', isSelected ? '2.5' : '2');
+            }
+        });
+        
+        // Render Content
+        switch (tabName) {
+            case 'itinerary':
+                renderItinerary();
+                break;
+            case 'flights':
+                renderFlights();
+                break;
+            case 'hotels':
+                renderHotels();
+                break;
+            case 'manhole':
+                renderManholeStockStatus();
+                break;
+        }
+    }
+
+    function setSelectedDay(dayId) {
+        if (selectedDayId === dayId) return;
+        selectedDayId = dayId;
+        renderItinerary(); // Re-render content and date selector
+    }
+
+    // --- 6. INITIALIZATION (初始化) ---
+    
+    // Attach Event Listeners to Nav Buttons (使用 data-tab 屬性來處理)
+    document.getElementById('tab-itinerary').onclick = () => setActiveTab('itinerary');
+    document.getElementById('tab-flights').onclick = () => setActiveTab('flights');
+    document.getElementById('tab-hotels').onclick = () => setActiveTab('hotels');
+    document.getElementById('tab-manhole').onclick = () => setActiveTab('manhole');
+
+    // Initial Render
+    setActiveTab('itinerary'); // Start on the itinerary tab
+    
+    // Create initial icons for the bottom nav
+    lucide.createIcons();
+
+</script>
+</body>
+</html>
